@@ -28,6 +28,8 @@ import requests
 import random
 import time
 import io
+import pymysql
+pymysql.install_as_MySQLdb()
 
 from datetime import datetime, timedelta
 
@@ -48,8 +50,9 @@ app.config['SESSION_COOKIE_SECURE'] = True  # ✅ True in production (HTTPS only
 
 database_url = os.getenv("DATABASE_URL")
 
-if database_url.startswith("mysql://"):
+if database_url and database_url.startswith("mysql://"):
     database_url = database_url.replace("mysql://", "mysql+pymysql://", 1)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
