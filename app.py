@@ -78,6 +78,9 @@ socketio = SocketIO(
     )
 oauth = OAuth(app)
 
+with app.app_context():
+    db.create_all()
+
 # ================== SECURITY HEADERS =============
 @app.after_request
 def add_security_headers(response):
