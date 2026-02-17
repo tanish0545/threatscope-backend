@@ -122,8 +122,6 @@ class Analysis(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
-with app.app_context():
-    db.create_all()
 
 # ================= GOOGLE LOGIN =================
 @app.route("/auth/google")
