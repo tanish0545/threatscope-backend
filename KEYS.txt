@@ -1,0 +1,1478 @@
+app.config['SECRET_KEY'] = "354df1ccc21850f50b34d0c2370252d4b096716f20fb53607fb20d84fabcd314"
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/threatscopedb'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = 'threatscope-super-secure-jwt-secret-key-2026'
+
+app.config['GOOGLE_CLIENT_ID'] = "717767444230-p1fi31c6j7jp30kn7ldd1ablb4oreb34.apps.googleusercontent.com"
+app.config['GOOGLE_CLIENT_SECRET'] = "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"
+app.config['VT_API_KEY'] = "d4d2af13c56794112d408d773cd2f75a43ca6f752e2bd9c028323b09f3fc43d8"
+
+app.config['OPENAI_API_KEY'] = "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"
+
+
+
+
+
+
+
+
+Analyzer.JSX
+
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
+
+export default function Analyzer() {
+
+  // ================= STATES =================
+  const [manualFile, setManualFile] = useState(null);
+  const [manualUrl, setManualUrl] = useState("");
+
+  const [aiFile, setAiFile] = useState(null);
+  const [aiUrl, setAiUrl] = useState("");
+
+  const [manualResult, setManualResult] = useState(null);
+  const [urlResult, setUrlResult] = useState(null);
+  const [aiResult, setAiResult] = useState(null);
+
+  const [loadingManual, setLoadingManual] = useState(false);
+  const [loadingAI, setLoadingAI] = useState(false);
+  
+  const [confidence, setConfidence] = useState(null);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // ================= TOKEN CHECK =================
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tokenFromUrl = params.get("token");
+
+    if (tokenFromUrl) {
+      localStorage.setItem("token", tokenFromUrl);
+      window.history.replaceState({}, document.title, "/analyzer");
+    }
+
+    const storedToken = localStorage.getItem("token");
+    if (!storedToken) navigate("/login");
+
+  }, []);
+
+  // ================= MANUAL FILE =================
+  const handleAnalyze = async () => {
+
+    const token = localStorage.getItem("token");
+    if (!token) return navigate("/login");
+
+    if (!manualFile) {
+      alert("Upload a file first");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", manualFile);
+
+    try {
+      setLoadingManual(true);
+
+      const res = await axios.post(
+        "http://127.0.0.1:5000/analyze",
+        formData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setManualResult(res.data);
+      setUrlResult(null);
+
+    } catch (err) {
+      console.error(err.response?.data || err);
+      alert("Manual analysis failed.");
+    } finally {
+      setLoadingManual(false);
+    }
+  };
+
+  // ================= MANUAL URL =================
+  const handleUrlAnalyze = async () => {
+
+    const token = localStorage.getItem("token");
+    if (!token) return navigate("/login");
+
+    if (!manualUrl) {
+      alert("Enter URL first");
+      return;
+    }
+
+    try {
+      setLoadingManual(true);
+
+      const res = await axios.post(
+        "http://127.0.0.1:5000/analyze-url",
+        { url: manualUrl },
+        { headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }}
+      );
+
+      setUrlResult(res.data);
+      setManualResult(null);
+
+    } catch (err) {
+      console.error(err.response?.data || err);
+      alert("URL analysis failed.");
+    } finally {
+      setLoadingManual(false);
+    }
+  };
+
+  // ================= AI ANALYSIS =================
+  const handleAiAnalyze = async () => {
+
+    const token = localStorage.getItem("token");
+    if (!token) return navigate("/login");
+
+    if (!aiFile && !aiUrl) {
+      alert("Upload file or enter URL for AI analysis");
+      return;
+    }
+
+    const formData = new FormData();
+    if (aiFile) formData.append("file", aiFile);
+    if (aiUrl) formData.append("url", aiUrl);
+
+    try {
+      setLoadingAI(true);
+
+      const res = await axios.post(
+        "http://127.0.0.1:5000/ai-analyze",
+        formData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setAiResult(res.data.ai_summary);
+      setConfidence(res.data.confidence);
+
+    } catch (err) {
+      console.error(err.response?.data || err);
+      alert("AI analysis failed.");
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+//=================== EXPORT PDF =================
+
+  const handleExportPDF = async () => {
+
+  const token = localStorage.getItem("token");
+
+  const res = await axios.post(
+    "http://127.0.0.1:5000/export-pdf",
+    {
+      filename: aiFile?.name || aiUrl,
+      risk,
+      score,
+      category,
+      ai_summary: aiResult,
+      confidence
+    },
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      responseType: "blob"
+    }
+  );
+
+  const url = window.URL.createObjectURL(new Blob([res.data]));
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", "Threat_Report.pdf");
+  document.body.appendChild(link);
+  link.click();
+};
+
+  return (
+    <div style={{ padding: "60px" }}>
+      <h1 className="cyber-title" style={{ textAlign: "center" }}>
+        Threat Analyzer
+      </h1>
+
+      <div style={{
+        display: "flex",
+        justifyContent: "center",
+        gap: "40px",
+        marginTop: "50px",
+        flexWrap: "wrap"
+      }}>
+
+        {/* ================= MANUAL PANEL ================= */}
+        <div style={{
+          border: "2px dashed #00e5ff",
+          padding: "30px",
+          borderRadius: "16px",
+          width: "420px",
+          background: "rgba(0,0,0,0.25)"
+        }}>
+
+          <h2 style={{ textAlign: "center", color: "#00fffb" }}>Manual Threat Scan</h2>
+        <br />
+
+        <h3>File Analysis</h3>
+
+        <br />
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              setManualFile(e.dataTransfer.files[0]);
+            }}
+            style={{
+              border: "2px dashed #00e5ff",
+              padding: "55px",
+              borderRadius: "10px",
+              textAlign: "center",
+              marginBottom: "20px"
+            }}
+          >
+            <p>{manualFile ? manualFile.name : "Drag & Drop File Here"}</p>
+          </div>
+          <br />
+          <label className="primary-btn1" style={{ cursor: "pointer" }}>
+            Upload File
+            <input
+              type="file"
+              hidden
+              onChange={(e) => setManualFile(e.target.files[0])}
+            />
+          </label>
+
+          <div style={{ marginTop: "20px"}}>
+            <button className="primary-btn" onClick={handleAnalyze}>
+              {loadingManual ? "Analyzing..." : "Analyze File"}
+            </button>
+          </div>
+
+          {manualResult && (
+            <div style={{ marginTop: "20px", padding: "15px", borderRadius: "10px", border: "1px solid #00e5ff" }}>
+               <b>Risk:</b>
+             <span
+        style={{
+          marginLeft: "10px",
+          fontWeight: "bold",
+          color:
+            manualResult?.risk === "CRITICAL"
+              ? "#ff0000"
+              : manualResult?.risk === "HIGH"
+              ? "#ff4d4d"
+              : manualResult?.risk === "MEDIUM"
+              ? "#ffa500"
+              : manualResult?.risk === "LOW"
+              ? "#00ff00"
+              : "#ffffff"
+
+
+        }}
+      >
+        {manualResult?.risk || "Unknown"}
+      </span>
+              <p><b>Score:</b> {manualResult.score}</p>
+              <p><b>Keywords:</b> {manualResult.keywords?.join(", ")}</p>
+              <p>
+                {manualResult.category}
+               <b>Category:</b>{" "}
+              <span style={{ color: "#00ddff" }}>
+               </span>
+                    </p>
+            </div>
+          )}
+
+        
+
+          {manualResult?.virustotal && (
+           <div style={{ marginTop: "10px", padding: "15px", borderRadius: "10px", border: "1px solid #00e5ff" }}>
+             <p><b>VirusTotal Detection:</b></p>
+             <p>Malicious: {manualResult.virustotal.malicious}</p>
+              <p>Suspicious: {manualResult.virustotal.suspicious}</p>
+              <p>Harmless: {manualResult.virustotal.harmless}</p>
+          </div>
+         )}
+
+          <br />
+         
+         <h3 style={{ marginTop: "30px" }}>URL Analysis</h3>
+          <br />
+          <input
+            type="text"
+            placeholder="Enter URL"
+            value={manualUrl}
+            onChange={(e) => setManualUrl(e.target.value)}
+            style={{  border:"2px dashed #00e5ff", background: "rgba(77, 74, 74, 0.71)", borderRadius: "15px", width: "100%", padding: "10px" }}
+          />
+
+          <br /><br />
+
+          <button
+            className="primary-btn"
+            style={{ width: "100%" }}
+            onClick={handleUrlAnalyze}
+          >
+            {loadingManual ? "Analyzing..." : "Analyze URL"}
+          </button>
+
+          {urlResult && (
+            <div style={{ marginTop: "20px", padding: "15px", borderRadius: "10px", border: "1px solid #00e5ff" }}>
+              <p><b>Risk:</b> {urlResult.risk}</p>
+              <p>Malicious: {urlResult.malicious}</p>
+              <p>Suspicious: {urlResult.suspicious}</p>
+              <p>Harmless: {urlResult.harmless}</p>
+            </div>
+          )}
+
+        </div>
+
+        {/* ================= AI PANEL ================= */}
+        <div style={{
+          border: "2px dashed #9b59b6",
+          padding: "30px",
+          borderRadius: "16px",
+          width: "420px",
+          background: "rgba(0,0,0,0.25)"
+        }}>
+
+          <h2 style={{ textAlign: "center", color: "#9b59b6" }}>AI Security Intelligence</h2>
+          <br />
+          <h3>File Analysis</h3>
+          <br />
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              setAiFile(e.dataTransfer.files[0]);
+            }}
+            style={{
+              border: "2px dashed #9b59b6",
+              padding: "55px",
+              borderRadius: "10px",
+              textAlign: "center",
+              marginBottom: "20px"
+            }}
+          >
+            <p>{aiFile ? aiFile.name : "Drag & Drop File Here"}</p>
+          </div>
+          <br />
+          <label className="primary-btn3" style={{
+            background: "#9b59b6",
+            width: "100%",
+            cursor: "pointer"
+          }}>
+            Upload File
+            <input
+              type="file"
+              hidden
+              onChange={(e) => setAiFile(e.target.files[0])}
+            />
+          </label>
+          <br /><br />
+        
+          <h3 style={{ marginTop: "30px" }}>URL Analysis</h3>
+          <br />
+          <input
+            type="text"
+            placeholder="Enter URL"
+            value={aiUrl}
+            onChange={(e) => setAiUrl(e.target.value)}
+            style={{ width: "100%",  padding: "10px", borderRadius: "15px", border: "2px dashed #9b59b6", background: "rgba(77, 74, 74, 0.71)" }}
+          />
+
+          <br /><br />
+
+          <button
+            className="primary-btn4"
+            style={{ background: "#9b59b6", width: "100%",hover: { background: "#8e44ad" } }}
+            onClick={handleAiAnalyze}
+          >
+            {loadingAI ? "ThreatScope AI is analyzing deep patterns..." : "Run AI Analysis"}
+          </button>
+
+          {aiResult && (
+            <div style={{ marginTop: "20px" }}>
+              <h3>AI Security Insight</h3>
+              <p style={{ whiteSpace: "pre-line" }}>{aiResult}</p>
+              <p>
+                {aiResult.category}
+               <b>Category:</b>{" "}
+              <span style={{ color: "#9b59b6" }}>
+               </span>
+                    </p>
+              {confidence && (
+                <p style={{ marginTop: "10px", color: "#9b59b6" }}>
+                  Confidence Score: {confidence}%</p>
+              )}
+              <button
+                className="primary-btn"
+               onClick={handleExportPDF}
+                 >
+                Download Report
+               </button>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+======================= DASHBOARD ====================
+import { useEffect, useState } from "react";
+import axios from "axios";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
+} from "recharts";
+import { io } from "socket.io-client";
+
+export default function Dashboard() {
+
+  const [stats, setStats] = useState(null);
+  const [recent, setRecent] = useState([]);
+  const [liveAlerts, setLiveAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const token = localStorage.getItem("token");
+
+  // ================= FETCH DASHBOARD =================
+  const fetchDashboard = async () => {
+    try {
+      const statsRes = await axios.get(
+        "http://127.0.0.1:5000/dashboard-stats",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const recentRes = await axios.get(
+        "http://127.0.0.1:5000/dashboard-recent",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setStats(statsRes.data);
+      setRecent(recentRes.data);
+
+      // Auto filter critical alerts
+      const criticalOnly = recentRes.data.filter(
+        item => item.risk === "CRITICAL"
+      );
+      setLiveAlerts(criticalOnly);
+
+      setLoading(false);
+
+    } catch (err) {
+      console.error("Dashboard Error:", err);
+      setLoading(false);
+    }
+  };
+
+  // ================= SOCKET LISTENER =================
+  useEffect(() => {
+
+    fetchDashboard();
+
+    const socket = io("http://127.0.0.1:5000");
+
+    socket.on("connect", () => {
+      console.log("Socket connected");
+    });
+
+    socket.on("new_analysis", () => {
+      console.log("New analysis received");
+      fetchDashboard();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+
+  }, []);
+
+  // ================= LOADING PROTECTION =================
+  if (loading || !stats) {
+    return (
+      <div style={{ padding: "40px", color: "#fff" }}>
+        Loading Dashboard...
+      </div>
+    );
+  }
+
+  // ================= SYSTEM STATUS =================
+  const systemStatus =
+    stats.critical > 0
+      ? { text: "AT RISK", color: "#ff0000" }
+      : stats.high > 3
+      ? { text: "ELEVATED", color: "#ffa500" }
+      : { text: "SECURE", color: "#00ff00" };
+
+  // ================= CHART DATA =================
+  const barData = [
+    { name: "Critical", value: stats.critical },
+    { name: "High", value: stats.high },
+    { name: "Medium", value: stats.medium },
+    { name: "Low", value: stats.low }
+  ];
+
+  const pieData = [...barData];
+
+  const COLORS = ["#ff0000", "#ff4d4d", "#ffa500", "#00ff00"];
+
+  const lineData = recent.map((r) => ({
+    name: r.time,
+    score: r.score
+  }));
+
+  return (
+    <div style={{ padding: "40px", color: "#fff" }}>
+
+      {/* ================= HEADER ================= */}
+      <div style={{
+        padding: "20px",
+        border: "1px solid #00e5ff",
+        borderRadius: "12px",
+        marginBottom: "30px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }}>
+        <div>
+          <h2>SOC Command Center</h2>
+          <p>
+            System Status:
+            <span style={{
+              color: systemStatus.color,
+              marginLeft: "10px",
+              fontWeight: "bold"
+            }}>
+              {systemStatus.text}
+            </span>
+          </p>
+        </div>
+        <div>
+          <p>Total Scans: {stats.total}</p>
+          <p>Avg Score: {stats.avg_score}</p>
+        </div>
+      </div>
+
+      {/* ================= KPI CARDS ================= */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: "20px",
+        marginBottom: "40px"
+      }}>
+        {["total", "critical", "high", "medium", "low"].map((key, i) => (
+          <div key={i} style={{
+            padding: "20px",
+            borderRadius: "12px",
+            border: "1px solid #00e5ff",
+            background: "rgba(0,0,0,0.4)",
+            textAlign: "center"
+          }}>
+            <h3 style={{ textTransform: "capitalize" }}>{key}</h3>
+            <p style={{ fontSize: "22px", fontWeight: "bold" }}>
+              {stats[key]}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* ================= MAIN CONTENT ================= */}
+      <div style={{ display: "flex", gap: "30px", flexWrap: "wrap" }}>
+
+        {/* LEFT SIDE */}
+        <div style={{ flex: 2 }}>
+
+          {/* LINE */}
+          <div style={{
+            border: "1px solid #00e5ff",
+            borderRadius: "12px",
+            padding: "20px",
+            marginBottom: "30px"
+          }}>
+            <h3>Threat Score Trend</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={lineData}>
+                <CartesianGrid stroke="#444" />
+                <XAxis dataKey="name" stroke="#fff" />
+                <YAxis stroke="#fff" />
+                <Tooltip />
+                <Line type="monotone" dataKey="score" stroke="#00e5ff" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* BAR */}
+          <div style={{
+            border: "1px solid #00e5ff",
+            borderRadius: "12px",
+            padding: "20px"
+          }}>
+            <h3>Risk Distribution</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={barData}>
+                <CartesianGrid stroke="#444" />
+                <XAxis dataKey="name" stroke="#fff" />
+                <YAxis stroke="#fff" />
+                <Tooltip />
+                <Bar dataKey="value" fill="#00e5ff" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+        </div>
+
+        {/* RIGHT SIDE LIVE FEED */}
+        <div style={{
+          flex: 1,
+          border: "1px solid #00e5ff",
+          borderRadius: "12px",
+          padding: "20px",
+          maxHeight: "650px",
+          overflowY: "auto"
+        }}>
+          <h3>Live Incident Feed</h3>
+
+          {recent.map((item, index) => (
+            <div key={index} style={{
+              padding: "10px",
+              marginBottom: "10px",
+              borderBottom: "1px solid #333"
+            }}>
+              <p>
+                [{item.time}]{" "}
+                <span style={{
+                  color:
+                    item.risk === "CRITICAL"
+                      ? "#ff0000"
+                      : item.risk === "HIGH"
+                      ? "#ff4d4d"
+                      : item.risk === "MEDIUM"
+                      ? "#ffa500"
+                      : "#00ff00"
+                }}>
+                  {item.risk}
+                </span>{" "}
+                - {item.filename}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ================= CRITICAL ALERT PANEL ================= */}
+      <div style={{
+        marginTop: "30px",
+        padding: "20px",
+        borderRadius: "12px",
+        background: "rgba(255,0,0,0.15)",
+        border: "1px solid red"
+      }}>
+        <h3 style={{ color: "red" }}>🚨 Live Critical Alerts</h3>
+
+        {liveAlerts.length === 0 && (
+          <p style={{ color: "#aaa" }}>No critical alerts detected.</p>
+        )}
+
+        {liveAlerts.map((alert, index) => (
+          <div key={index} style={{
+            marginTop: "10px",
+            padding: "10px",
+            background: "rgba(0,0,0,0.4)",
+            borderRadius: "8px"
+          }}>
+            <p><b>File:</b> {alert.filename}</p>
+            <p><b>Score:</b> {alert.score}</p>
+            <p><b>Category:</b> {alert.category}</p>
+            <p><b>Time:</b> {alert.time}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ================= PIE ================= */}
+      <div style={{
+        border: "1px solid #00e5ff",
+        borderRadius: "12px",
+        padding: "20px",
+        marginTop: "40px"
+      }}>
+        <h3>Threat Distribution Overview</h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <PieChart>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              nameKey="name"
+              outerRadius={120}
+              label
+            >
+              {pieData.map((entry, index) => (
+                <Cell key={index} fill={COLORS[index]} />
+              ))}
+            </Pie>
+            <Legend />
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+
+    </div>
+  );
+}
+
+==================== ANALYZER =====================
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
+
+export default function Analyzer() {
+
+  // ================= STATES =================
+  const [manualFile, setManualFile] = useState(null);
+  const [manualUrl, setManualUrl] = useState("");
+
+  const [aiFile, setAiFile] = useState(null);
+  const [aiUrl, setAiUrl] = useState("");
+
+  const [manualResult, setManualResult] = useState(null);
+  const [urlResult, setUrlResult] = useState(null);
+
+  // 🔥 IMPORTANT CHANGE
+  const [aiResult, setAiResult] = useState(null);
+  const [aiData, setAiData] = useState(null); // Store full AI result for PDF export
+
+  const [loadingManual, setLoadingManual] = useState(false);
+  const [loadingAI, setLoadingAI] = useState(false);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // ================= TOKEN CHECK =================
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tokenFromUrl = params.get("token");
+
+    if (tokenFromUrl) {
+      localStorage.setItem("token", tokenFromUrl);
+      window.history.replaceState({}, document.title, "/analyzer");
+    }
+
+    const storedToken = localStorage.getItem("token");
+    if (!storedToken) navigate("/login");
+
+  }, []);
+
+  // ================= MANUAL FILE =================
+  const handleAnalyze = async () => {
+
+    const token = localStorage.getItem("token");
+    if (!token) return navigate("/login");
+
+    if (!manualFile) {
+      alert("Upload a file first");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", manualFile);
+
+    try {
+      setLoadingManual(true);
+
+      const res = await axios.post(
+        "http://127.0.0.1:5000/analyze",
+        formData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setManualResult(res.data);
+      setUrlResult(null);
+
+    } catch (err) {
+      console.error(err.response?.data || err);
+      alert("Manual analysis failed.");
+    } finally {
+      setLoadingManual(false);
+    }
+  };
+
+  // ================= MANUAL URL =================
+  const handleUrlAnalyze = async () => {
+
+    const token = localStorage.getItem("token");
+    if (!token) return navigate("/login");
+
+    if (!manualUrl) {
+      alert("Enter URL first");
+      return;
+    }
+
+    try {
+      setLoadingManual(true);
+
+      const res = await axios.post(
+        "http://127.0.0.1:5000/analyze-url",
+        { url: manualUrl },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      setUrlResult(res.data);
+      setManualResult(null);
+
+    } catch (err) {
+      console.error(err.response?.data || err);
+      alert("URL analysis failed.");
+    } finally {
+      setLoadingManual(false);
+    }
+  };
+
+  // ================= AI ANALYSIS =================
+  const handleAiAnalyze = async () => {
+
+    const token = localStorage.getItem("token");
+    if (!token) return navigate("/login");
+
+    if (!aiFile && !aiUrl) {
+      alert("Upload file or enter URL for AI analysis");
+      return;
+    }
+
+    const formData = new FormData();
+    if (aiFile) formData.append("file", aiFile);
+    if (aiUrl) formData.append("url", aiUrl);
+
+    try {
+      setLoadingAI(true);
+
+      const res = await axios.post(
+        "http://127.0.0.1:5000/ai-analyze",
+        formData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // 🔥 FIX: STORE FULL OBJECT
+      setAiResult(res.data);
+      setUrlResult(null);
+      setAiData(res.data); // Store full AI result for PDF export
+    } catch (err) {
+      console.error(err.response?.data || err);
+      alert("AI analysis failed.");
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  // ================= EXPORT PDF =================
+  const handleExportPDF = async () => {
+  try {
+    // Make sure AI analysis was run
+    if (!aiData) {
+      alert("Please run AI Analysis first.");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      alert("Session expired. Please login again.");
+      navigate("/login");
+      return;
+    }
+
+    const response = await axios.post(
+      "http://127.0.0.1:5000/export-pdf",
+      aiData, // send full AI result object
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        responseType: "blob",
+      }
+    );
+
+    // Create file blob
+    const blob = new Blob([response.data], {
+      type: "application/pdf",
+    });
+
+    const url = window.URL.createObjectURL(blob);
+
+    // Create temporary link
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "Threat_Report.pdf";
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Export PDF error:", error.response?.data || error);
+    alert("Failed to download report.");
+  }
+};
+
+  return (
+    <div style={{ padding: "60px" }}>
+      <h1 className="cyber-title" style={{ textAlign: "center" }}>
+        Threat Analyzer
+      </h1>
+
+      <div style={{
+        display: "flex",
+        justifyContent: "center",
+        gap: "40px",
+        marginTop: "50px",
+        flexWrap: "wrap"
+      }}>
+
+        {/* ================= MANUAL PANEL ================= */}
+        <div style={{
+  border: "2px dashed #00e5ff",
+  padding: "30px",
+  borderRadius: "16px",
+  width: "420px",
+  background: "rgba(0,0,0,0.25)"
+}}>
+
+  <h2 style={{ textAlign: "center", color: "#00fffb" }}>
+    Manual Threat Scan
+  </h2>
+
+  <br />
+
+  {/* ================= FILE SECTION ================= */}
+  <h3>File Analysis</h3>
+  <br />
+
+  <div
+    onDragOver={(e) => e.preventDefault()}
+    onDrop={(e) => {
+      e.preventDefault();
+      setManualFile(e.dataTransfer.files[0]);
+    }}
+    style={{
+      border: "2px dashed #00e5ff",
+      padding: "55px",
+      borderRadius: "10px",
+      textAlign: "center",
+      marginBottom: "20px"
+    }}
+  >
+    <p>{manualFile ? manualFile.name : "Drag & Drop File Here"}</p>
+  </div>
+
+  <label className="primary-btn1" style={{ cursor: "pointer" }}>
+    Upload File
+    <input
+      type="file"
+      hidden
+      onChange={(e) => setManualFile(e.target.files[0])}
+    />
+  </label>
+
+  <br /><br />
+
+  {/* ================= OR ================= */}
+  <div style={{
+    textAlign: "center",
+    fontWeight: "bold",
+    color: "#00e5ff",
+    margin: "20px 0"
+  }}>
+    -------- OR --------
+  </div>
+
+  {/* ================= URL SECTION ================= */}
+  <h3>URL Analysis</h3>
+  <br />
+
+  <input
+    type="text"
+    placeholder="Enter URL"
+    value={manualUrl}
+    onChange={(e) => setManualUrl(e.target.value)}
+    style={{
+      border: "2px dashed #00e5ff",
+      background: "rgba(77, 74, 74, 0.71)",
+      borderRadius: "15px",
+      width: "100%",
+      padding: "10px"
+    }}
+  />
+
+  <br /><br />
+
+  {/* ================= SINGLE ANALYZE BUTTON ================= */}
+  <button
+    className="primary-btn5"
+    style={{ width: "100%" }}
+    onClick={() => {
+      if (manualFile) {
+        handleAnalyze();
+      } else if (manualUrl) {
+        handleUrlAnalyze();
+      } else {
+        alert("Upload file or enter URL");
+      }
+    }}
+  >
+    {loadingManual ? "Analyzing..." : "Analyze Threat"}
+  </button>
+
+  {/* ================= RESULT AT BOTTOM ================= */}
+  {(manualResult || urlResult) && (
+    <div style={{
+      marginTop: "25px",
+      padding: "15px",
+      borderRadius: "10px",
+      border: "1px solid #00e5ff"
+    }}>
+
+      <p>
+        <b>Risk:</b>{" "}
+        <span
+          style={{
+            fontWeight: "bold",
+            color:
+              (manualResult?.risk || urlResult?.risk) === "CRITICAL"
+                ? "#ff0000"
+                : (manualResult?.risk || urlResult?.risk) === "HIGH"
+                ? "#ff4d4d"
+                : (manualResult?.risk || urlResult?.risk) === "MEDIUM"
+                ? "#ffa500"
+                : (manualResult?.risk || urlResult?.risk) === "LOW"
+                ? "#00ff00"
+                : "#ffffff"
+          }}
+        >
+          {manualResult?.risk || urlResult?.risk}
+        </span>
+      </p>
+
+      <p><b>Score:</b> {manualResult?.score || urlResult?.score}</p>
+
+      <p>
+        <b>Category:</b>{" "}
+        <span style={{ color: "#00e5ff", fontWeight: "bold" }}>
+          {manualResult?.category || urlResult?.category}
+        </span>
+      </p>
+
+      {manualResult?.keywords && (
+        <p><b>Keywords:</b> {manualResult.keywords.join(", ")}</p>
+      )}
+
+      {(manualResult?.virustotal || urlResult?.virustotal) && (
+        <>
+          <p><b>VirusTotal Detection:</b></p>
+          <p>Malicious: {(manualResult?.virustotal || urlResult?.virustotal)?.malicious}</p>
+          <p>Suspicious: {(manualResult?.virustotal || urlResult?.virustotal)?.suspicious}</p>
+          <p>Harmless: {(manualResult?.virustotal || urlResult?.virustotal)?.harmless}</p>
+        </>
+      )}
+
+    </div>
+  )}
+
+</div>
+        {/* ================= AI PANEL ================= */}
+        <div style={{
+          border: "2px dashed #9b59b6",
+          padding: "30px",
+          borderRadius: "16px",
+          width: "420px",
+          background: "rgba(0,0,0,0.25)"
+        }}>
+
+          <h2 style={{ textAlign: "center", color: "#9b59b6" }}>AI Security Intelligence</h2>
+          <br />
+          <h3>File Analysis</h3>
+          <br />
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              setAiFile(e.dataTransfer.files[0]);
+            }}
+            style={{
+              border: "2px dashed #9b59b6",
+              padding: "55px",
+              borderRadius: "10px",
+              textAlign: "center",
+              marginBottom: "20px"
+            }}
+          >
+            <p>{aiFile ? aiFile.name : "Drag & Drop File Here"}</p>
+          </div>
+          
+          <label className="primary-btn3" style={{
+            background: "#9b59b6",
+            width: "100%",
+            cursor: "pointer"
+          }}>
+            Upload File
+            <input
+              type="file"
+              hidden
+              onChange={(e) => setAiFile(e.target.files[0])}
+            />
+          </label>
+          <br /><br />
+        {/* ================= OR ================= */}
+            <div style={{
+             textAlign: "center",
+               fontWeight: "bold",
+               color: "#9b59b6",
+               margin: "20px 0"
+               }}>
+               -------- OR --------
+              </div>
+
+          <h3 style={{ marginTop: "30px" }}>URL Analysis</h3>
+          <br />
+          <input
+            type="text"
+            placeholder="Enter URL"
+            value={aiUrl}
+            onChange={(e) => setAiUrl(e.target.value)}
+            style={{ width: "100%",  padding: "10px", borderRadius: "15px", border: "2px dashed #9b59b6", background: "rgba(77, 74, 74, 0.71)" }}
+          />
+
+          <br /><br />
+
+          <button
+            className="primary-btn4"
+            style={{ background: "#9b59b6", width: "100%",hover: { background: "#8e44ad" } }}
+            onClick={handleAiAnalyze}
+          >
+            {loadingAI ? "ThreatScope AI is analyzing deep patterns..." : "Run AI Analysis"}
+          </button>
+
+          {aiResult && (
+            <div style={{ marginTop: "20px" }}>
+               <h3>AI Security Insight</h3>
+
+                <p><b>Risk:</b> {aiResult?.risk || "N/A"}</p>
+                <p><b>Score:</b> {aiResult?.score || "N/A"}</p>
+                <p><b>Category:</b> {aiResult?.category || "N/A"}</p>
+
+                <p style={{ whiteSpace: "pre-line" }}>
+              {aiResult?.ai_summary}
+              </p>
+
+              {aiResult?.confidence && (
+              <p style={{ marginTop: "10px", color: "#9b59b6" }}>
+                Confidence Score: {aiResult.confidence}%
+          </p>
+      )}
+
+    <button
+      className="primary-btn"
+      onClick={handleExportPDF}
+    >
+      Download Report
+    </button>
+  </div>
+)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+===================== NAVBAR =======================
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
+
+function Navbar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [profilePic, setProfilePic] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem("token"));
+  const [open, setOpen] = useState(false);
+
+  // ✅ Handle token from URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tokenFromUrl = params.get("token");
+
+    if (tokenFromUrl) {
+      localStorage.setItem("token", tokenFromUrl);
+      setToken(tokenFromUrl);
+      window.history.replaceState({}, document.title, location.pathname);
+    } else {
+      setToken(localStorage.getItem("token"));
+    }
+  }, [location]);
+
+  // ✅ Decode profile picture
+ useEffect(() => {
+  const storedToken = localStorage.getItem("token");
+
+  if (storedToken) {
+    try {
+      const decoded = jwtDecode(storedToken);
+
+      console.log("Decoded JWT:", decoded); // debug
+
+      setProfilePic(decoded.picture || null);
+
+    } catch (err) {
+      console.log("JWT decode failed");
+      setProfilePic(null);
+    }
+  }
+}, [location]);   // 👈 important change
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setToken(null);
+    navigate("/login");
+  };
+
+  return (
+    <nav className="navbar">
+      <div className="logo">ThreatScope</div>
+
+      <div className="nav-links">
+        <Link to="/">Home</Link>
+        <Link to="/dashboard">Dashboard</Link>
+        <Link to="/analyzer">Analyzer</Link>
+        <Link to="/history">History</Link>
+      </div>
+
+      <div className="nav-right">
+        {!token && <Link to="/login">Login</Link>}
+
+        {token && profilePic && (
+          <div className="profile-wrapper">
+            <img
+  src={
+    profilePic
+      ? profilePic.replace("s96-c", "s200-c")
+      : "https://i.pravatar.cc/150?img=12"
+  }
+  alt="profile"
+  className="profile-pic"
+  onClick={() => setOpen(!open)}
+/>
+
+            {open && (
+              <div className="profile-dropdown">
+                <button onClick={handleLogout}>Logout</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+export default Navbar;
+
+
+======================= HOME =======================
+import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+
+export default function Home() {
+  const navigate = useNavigate();
+
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // ================= MOUSE TRACKING =================
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      setMousePos({
+        x: e.clientX,
+        y: e.clientY
+      });
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
+  return (
+    <>
+      {/* ================= BACKGROUND RADAR ================= */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: -2,
+          background:
+            "radial-gradient(circle at center, rgba(0,229,255,0.08) 0%, transparent 70%)",
+          animation: "radarRotate 8s linear infinite"
+        }}
+      />
+
+      {/* ================= MOUSE LIGHT GLOW ================= */}
+      <div
+        style={{
+          position: "fixed",
+          top: mousePos.y - 150,
+          left: mousePos.x - 150,
+          width: "200px",
+          height: "200px",
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(0,229,255,0.25) 0%, transparent 70%)",
+          pointerEvents: "none",
+          zIndex: -1,
+          transition: "0.1s"
+        }}
+      />
+
+      {/* ================= HERO SECTION ================= */}
+      <div className="hero">
+        <h1 className="cyber-title">ThreatScope</h1>
+
+        <p>
+          Enterprise-Grade Cyber Threat Intelligence Platform designed for
+          SOC teams, cybersecurity analysts, and digital infrastructure
+          protection. Detect, classify, and respond to advanced threats
+          using hybrid manual detection and AI-powered behavioral analysis.
+        </p>
+
+        <button
+          className="primary-btn0"
+          onClick={() => navigate("/analyzer")}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "10px"
+          }}
+        >
+           Start Analysis
+        </button>
+
+        <div style={{ marginTop: "20px", color: "#00e5ff" }}>
+          ⚡ Real-Time Threat Monitoring | 🛡️ AI Intelligence Engine |
+          📊 SOC Command Dashboard
+        </div>
+      </div>
+
+      {/* ================= CORE FEATURES ================= */}
+      <div className="card-section">
+        <div className="card">
+          <h3>Manual Threat Detection Engine</h3>
+          <p>
+            Signature-based and keyword-driven static analysis detecting
+            malware indicators, CVEs, command-and-control patterns,
+            privilege escalation attempts, and exploit signatures.
+          </p>
+        </div>
+
+        <div className="card">
+          <h3>AI Security Intelligence</h3>
+          <p>
+            Simulated AI threat modeling engine that evaluates risk levels,
+            behavioral indicators, anomaly scoring, confidence analysis,
+            and generates structured mitigation recommendations.
+          </p>
+        </div>
+
+        <div className="card">
+          <h3>SOC Enterprise Dashboard</h3>
+          <p>
+            Interactive security operations dashboard featuring live alerts,
+            risk distribution analytics, incident feed, KPI monitoring,
+            and real-time system security posture visualization.
+          </p>
+        </div>
+      </div>
+
+      {/* ================= PLATFORM CAPABILITIES ================= */}
+      <div className="supported">
+        <h2>Platform Capabilities</h2>
+
+        <div className="file-tags">
+          <div className="file-tag">AI Threat Classification</div>
+          <div className="file-tag">Risk Scoring Engine</div>
+          <div className="file-tag">Threat Category Mapping</div>
+          <div className="file-tag">VirusTotal Hash Lookup</div>
+          <div className="file-tag">PDF Report Export</div>
+          <div className="file-tag">Real-Time Alerting</div>
+          <div className="file-tag">JWT Secure Authentication</div>
+          <div className="file-tag">Google OAuth Login</div>
+        </div>
+      </div>
+
+      {/* ================= SUPPORTED FILE TYPES ================= */}
+      <div className="supported">
+        <h2>Supported File Types & Inputs</h2>
+
+        <div className="file-tags">
+          <div className="file-tag">PDF</div>
+          <div className="file-tag">TXT</div>
+          <div className="file-tag">LOG</div>
+          <div className="file-tag">DOCX</div>
+          <div className="file-tag">CSV</div>
+          <div className="file-tag">JPG</div>
+          <div className="file-tag">PNG</div>
+          <div className="file-tag">WEBP</div>
+          <div className="file-tag">URL</div>
+        </div>
+      </div>
+
+      {/* ================= WHY THREATSCOPE ================= */}
+      <div className="supported">
+        <h2>Why ThreatScope?</h2>
+
+        <div style={{ maxWidth: "900px", margin: "0 auto", textAlign: "center" }}>
+          <p>
+            Unlike traditional antivirus tools that rely purely on static
+            signatures, ThreatScope combines rule-based detection,
+            AI-driven behavioral modeling, threat categorization, and SOC-level
+            analytics into a unified cyber defense ecosystem.
+          </p>
+
+          <p style={{ marginTop: "15px", color: "#00e5ff" }}>
+            Built for cybersecurity learners, analysts, and enterprise-level
+            simulation environments.
+          </p>
+        </div>
+      </div>
+
+      {/* ================= RADAR KEYFRAMES ================= */}
+      <style>
+        {`
+          @keyframes radarRotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
+    </>
+  );
+}
