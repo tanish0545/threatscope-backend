@@ -70,7 +70,7 @@ app.config['GOOGLE_CLIENT_SECRET'] = os.getenv("GOOGLE_CLIENT_SECRET")
 app.config['VT_API_KEY'] = os.getenv("VT_API_KEY")
 
 # ================= CORS LOCK =================
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://threatscope-frontend.vercel.app/")
 
 CORS(
     app,
